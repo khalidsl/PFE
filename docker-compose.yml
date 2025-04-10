@@ -1,0 +1,74 @@
+# version: '3.8'
+
+services:
+  # Service MongoDB
+  mongodb:
+    image: mongo:latest
+    container_name: evoting-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${DB_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_PASSWORD}
+      MONGO_INITDB_DATABASE: ${DB_NAME}
+    volumes:
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - mongodb_data:/data/db
+    networks:
+      - evoting-network
+
+  # Service Backend Node.js
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: evoting-backend
+    restart: always
+    ports:
+      - "${PORT}:${PORT}"
+    depends_on:
+      - mongodb
+    environment:
+      - PORT=${PORT}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=mongodb
+      - DB_PORT=27017
+      - DB_NAME=${DB_NAME}
+      - JWT_SECRET=${JWT_SECRET}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL}
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - evoting-network
+
+  # Service Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: evoting-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:${PORT}/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    networks:
+      - evoting-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  evoting-network:
+    driver: bridge
+
