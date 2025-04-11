@@ -21,7 +21,7 @@ app.use(cookieParser())
 app.use(morgan("dev"))
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin:"http://localhost:3000",
     credentials: true,
   }),
 )
@@ -62,6 +62,7 @@ const connectDB = async () => {
 
     return conn
   } catch (error) {
+    console.log("Erreur de connexion à MongoDB:", error.message)
     console.error(`Erreur: ${error.message}`)
     process.exit(1)
   }

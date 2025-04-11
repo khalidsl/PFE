@@ -25,4 +25,3 @@ router.put("/profile", authenticateJWT, authController.updateProfile)
 router.get("/users", authenticateJWT, isAdmin, authController.getAllUsers)
 
 module.exports = router
-
