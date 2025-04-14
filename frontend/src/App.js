@@ -20,6 +20,9 @@ import AdminDashboardPage from "./pages/AdminDashboardPage"
 import CreateElectionPage from "./pages/CreateElectionPage"
 import EditElectionPage from "./pages/EditElectionPage"
 import BlockchainStatusPage from "./pages/BlockchainStatusPage"
+import VerifyEmailPage from "./pages/VerifyEmailPage"
+import ResendVerificationPage from "./pages/ResendVerificationPage"
+import OTPVerificationPage from "./pages/OTPVerificationPage"
 
 function App() {
   const { loading } = useAuth()
@@ -40,6 +43,9 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
+          <Route path="/verify-otp" element={<OTPVerificationPage />} />
+          <Route path="/resend-verification" element={<ResendVerificationPage />} />
 
           <Route path="/elections" element={<ElectionsPage />} />
           <Route path="/elections/:id" element={<ElectionDetailsPage />} />
@@ -108,4 +114,3 @@ function App() {
 }
 
 export default App
-

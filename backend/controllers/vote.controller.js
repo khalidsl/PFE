@@ -1,13 +1,10 @@
 const Vote = require("../models/Vote")
 const Election = require("../models/Election")
 const User = require("../models/User")
-const { validationResult } = require("express-validator")
 const blockchainService = require("../services/blockchain.service")
+const { validationResult } = require("express-validator")
 
-// Supprimez cette ligne qui cause l'erreur
-// const blockchain = new Blockchain() // Instantiate Blockchain
-
-// Enregistrer un vote
+// Cast a vote
 exports.castVote = async (req, res) => {
   try {
     const errors = validationResult(req)
@@ -16,183 +13,206 @@ exports.castVote = async (req, res) => {
     }
 
     const { electionId, candidateId } = req.body
-    const userId = req.user._id
+    const voterId = req.user._id
 
-    // Vérifier si l'élection existe
+    // Check if election exists and is active
     const election = await Election.findById(electionId)
     if (!election) {
-      return res.status(404).json({ message: "Élection non trouvée" })
+      return res.status(404).json({ message: "Election not found" })
     }
 
-    // Vérifier si l'élection est active
     const now = new Date()
-    if (!election.isActive || now < new Date(election.startDate) || now > new Date(election.endDate)) {
-      return res.status(400).json({ message: "L'élection n'est pas active" })
+    if (now < election.startDate || now > election.endDate || !election.isActive) {
+      return res.status(400).json({ message: "Election is not active" })
     }
 
-    // Vérifier si le candidat existe
+    // Check if candidate exists in this election
     const candidateExists = election.candidates.some((c) => c._id.toString() === candidateId)
     if (!candidateExists) {
-      return res.status(404).json({ message: "Candidat non trouvé" })
+      return res.status(404).json({ message: "Candidate not found in this election" })
     }
 
-    // Vérifier si l'utilisateur a déjà voté pour cette élection
-    const user = await User.findById(userId)
-    if (user.hasVoted && user.hasVoted.get(electionId)) {
-      return res.status(400).json({ message: "Vous avez déjà voté pour cette élection" })
+    // Check if user has already voted in this election
+    const user = await User.findById(voterId)
+    if (user.hasVoted && user.hasVoted.get(electionId.toString())) {
+      return res.status(400).json({ message: "You have already voted in this election" })
     }
 
-    // Générer un hash de vote
-    const voteHash = Vote.generateVoteHash(electionId, candidateId, userId, process.env.ENCRYPTION_KEY)
+    // Create timestamp for the vote
+    const timestamp = new Date()
 
-    // Ajouter le vote à la blockchain
-    try {
-      await blockchainService.addVoteToBlockchain(electionId.toString(), candidateId.toString(), userId.toString())
+    // Generate vote hash for verification
+    const voteHash = Vote.generateVoteHash(electionId, candidateId, voterId, process.env.ENCRYPTION_KEY)
 
-      console.log("Vote ajouté à la blockchain")
-    } catch (blockchainError) {
-      console.error("Erreur d'ajout à la blockchain:", blockchainError)
-      return res.status(400).json({ message: blockchainError.message })
-    }
-
-    // Créer le vote dans la base de données
+    // Create the vote
     const vote = await Vote.create({
       election: electionId,
       candidate: candidateId,
-      voter: userId,
+      voter: voterId,
+      timestamp,
       voteHash,
     })
 
-    // Mettre à jour le statut de vote de l'utilisateur
-    user.hasVoted.set(electionId, true)
+    // Update user's voting status
+    if (!user.hasVoted) {
+      user.hasVoted = new Map()
+    }
+    user.hasVoted.set(electionId.toString(), true)
     await user.save()
 
-    // Miner les votes si nécessaire (dans un système réel, cela serait fait par un processus séparé)
-    if (Math.random() < 0.2) {
-      // 20% de chance de miner un bloc après un vote
-      const newBlock = await blockchainService.mineVotes()
-      if (newBlock) {
-        // Mettre à jour les votes avec les informations du bloc
-        await Vote.updateMany(
-          { blockHash: { $exists: false } },
-          {
-            blockHash: newBlock.hash,
-            blockIndex: blockchainService.getFullBlockchain().length - 1,
-          },
-        )
-      }
+    // Add vote to blockchain
+    try {
+      const blockchainResult = await blockchainService.addVoteToBlockchain(vote)
+      console.log("Vote added to blockchain:", blockchainResult)
+    } catch (error) {
+      console.error("Error adding vote to blockchain:", error)
+      // Continue even if blockchain fails
     }
 
     res.status(201).json({
-      _id: vote._id,
-      election: vote.election,
-      voteHash: vote.voteHash,
-      timestamp: vote.timestamp,
-      message: "Vote enregistré avec succès et ajouté à la blockchain",
+      message: "Vote cast successfully",
+      voteId: vote._id,
+      voteHash,
     })
   } catch (error) {
-    console.error("Erreur d'enregistrement de vote:", error)
-    res.status(500).json({ message: "Erreur serveur" })
+    console.error("Error casting vote:", error)
+    if (error.code === 11000) {
+      // Duplicate key error
+      res.status(400).json({ message: "You have already voted in this election" })
+    } else {
+      res.status(500).json({ message: "Server error", error: error.message })
+    }
   }
 }
 
-// Obtenir les résultats d'une élection
+// Get election results
 exports.getElectionResults = async (req, res) => {
   try {
-    const electionId = req.params.id
+    const { id } = req.params
 
-    // Vérifier si l'élection existe
-    const election = await Election.findById(electionId)
+    // Check if election exists
+    const election = await Election.findById(id)
     if (!election) {
-      return res.status(404).json({ message: "Élection non trouvée" })
+      return res.status(404).json({ message: "Election not found" })
     }
 
-    // Vérifier si l'élection est terminée (sauf pour les admins)
+    // Check if election has ended
     const now = new Date()
-    if (new Date(election.endDate) > now && req.user.role !== "admin") {
-      return res.status(400).json({
-        message: "Les résultats ne sont disponibles qu'après la fin de l'élection",
-      })
+    if (now < election.endDate) {
+      return res.status(400).json({ message: "Election results are not available until the election ends" })
     }
 
-    // Compter les votes pour chaque candidat
-    const votes = await Vote.find({ election: electionId })
+    // Get vote counts for each candidate
+    const votes = await Vote.find({ election: id })
 
-    // Créer un objet pour stocker les résultats
-    const results = []
-    const totalVotes = votes.length
-
-    // Compter les votes pour chaque candidat
-    for (const candidate of election.candidates) {
-      const candidateVotes = votes.filter((v) => v.candidate.toString() === candidate._id.toString())
-      results.push({
+    // Count votes for each candidate
+    const results = {}
+    election.candidates.forEach((candidate) => {
+      results[candidate._id] = {
         candidateId: candidate._id,
         name: candidate.name,
         party: candidate.party,
-        voteCount: candidateVotes.length,
-      })
+        voteCount: 0,
+      }
+    })
+
+    votes.forEach((vote) => {
+      if (results[vote.candidate]) {
+        results[vote.candidate].voteCount++
+      }
+    })
+
+    // Convert to array and sort by vote count
+    const sortedResults = Object.values(results).sort((a, b) => b.voteCount - a.voteCount)
+
+    // Verify blockchain integrity
+    let blockchainVerified = false
+    try {
+      const blockchain = await blockchainService.getBlockchainStatus()
+      blockchainVerified = blockchain.isValid
+    } catch (error) {
+      console.error("Error verifying blockchain:", error)
     }
 
-    // Trier les résultats par nombre de votes (décroissant)
-    results.sort((a, b) => b.voteCount - a.voteCount)
-
-    // Vérifier l'intégrité de la blockchain
-    const isBlockchainValid = blockchainService.verifyBlockchain()
-
     res.json({
-      electionId,
+      electionId: id,
       title: election.title,
-      totalVotes,
-      results,
-      blockchainVerified: isBlockchainValid,
+      totalVotes: votes.length,
+      results: sortedResults,
+      blockchainVerified,
     })
   } catch (error) {
-    console.error("Erreur de récupération des résultats:", error)
-    res.status(500).json({ message: "Erreur serveur" })
+    console.error("Error getting election results:", error)
+    res.status(500).json({ message: "Server error", error: error.message })
   }
 }
 
-// Vérifier un vote
+// Verify a vote
 exports.verifyVote = async (req, res) => {
   try {
     const voteId = req.params.id
 
-    // Trouver le vote
+    // Find the vote
     const vote = await Vote.findById(voteId)
     if (!vote) {
-      return res.status(404).json({ message: "Vote non trouvé" })
+      return res.status(404).json({ message: "Vote not found" })
     }
 
-    // Vérifier si l'utilisateur est le propriétaire du vote ou un admin
+    // Verify if the vote belongs to the user
     if (vote.voter.toString() !== req.user._id.toString() && req.user.role !== "admin") {
-      return res.status(403).json({ message: "Non autorisé" })
+      return res.status(401).json({ message: "Not authorized to verify this vote" })
     }
 
-    // Trouver l'élection
+    // Find the election
     const election = await Election.findById(vote.election)
     if (!election) {
-      return res.status(404).json({ message: "Élection non trouvée" })
+      return res.status(404).json({ message: "Election not found" })
     }
 
-    // Trouver le candidat
+    // Find the candidate
     const candidate = election.candidates.find((c) => c._id.toString() === vote.candidate.toString())
     if (!candidate) {
-      return res.status(404).json({ message: "Candidat non trouvé" })
+      return res.status(404).json({ message: "Candidate not found" })
     }
 
-    // Vérifier si le vote est dans la blockchain
+    // Verify if the vote is in the blockchain
     let blockchainVerification = {
       inBlockchain: false,
       blockHash: null,
       blockIndex: null,
     }
 
-    if (vote.blockHash) {
-      blockchainVerification = {
-        inBlockchain: true,
-        blockHash: vote.blockHash,
-        blockIndex: vote.blockIndex,
+    try {
+      if (vote.blockHash) {
+        blockchainVerification = {
+          inBlockchain: true,
+          blockHash: vote.blockHash,
+          blockIndex: vote.blockIndex,
+        }
+      } else {
+        // Verify if the vote is pending inclusion
+        const verificationResult = await blockchainService.verifyVote(vote)
+        if (verificationResult.verified) {
+          blockchainVerification = {
+            inBlockchain: true,
+            blockHash: verificationResult.blockHash,
+            blockIndex: verificationResult.blockIndex,
+          }
+
+          // Update the vote with block information
+          vote.blockHash = verificationResult.blockHash
+          vote.blockIndex = verificationResult.blockIndex
+          await vote.save()
+        } else if (verificationResult.message && verificationResult.message.includes("attente")) {
+          blockchainVerification = {
+            inBlockchain: false,
+            message: "Vote en attente d'inclusion dans la blockchain",
+          }
+        }
       }
+    } catch (error) {
+      console.error("Error verifying blockchain:", error)
+      blockchainVerification.error = "Erreur lors de la vérification blockchain"
     }
 
     res.json({
@@ -212,86 +232,79 @@ exports.verifyVote = async (req, res) => {
       blockchain: blockchainVerification,
     })
   } catch (error) {
-    console.error("Erreur de vérification de vote:", error)
-    res.status(500).json({ message: "Erreur serveur" })
+    console.error("Error verifying vote:", error)
+    res.status(500).json({ message: "Server error", error: error.message })
   }
 }
 
-// Obtenir les votes de l'utilisateur
+// Get user votes
 exports.getUserVotes = async (req, res) => {
   try {
     const userId = req.user._id
 
-    // Trouver tous les votes de l'utilisateur
-    const votes = await Vote.find({ voter: userId }).sort({ timestamp: -1 })
+    // Find all votes by this user
+    const votes = await Vote.find({ voter: userId }).populate("election", "title startDate endDate")
 
-    // Récupérer les détails des élections et des candidats
-    const votesWithDetails = await Promise.all(
-      votes.map(async (vote) => {
-        const election = await Election.findById(vote.election)
-        if (!election) {
-          return null
-        }
-
-        const candidate = election.candidates.find((c) => c._id.toString() === vote.candidate.toString())
-        if (!candidate) {
-          return null
-        }
-
-        return {
-          _id: vote._id,
-          election: {
-            _id: election._id,
-            title: election.title,
-          },
-          candidate: {
-            name: candidate.name,
-            party: candidate.party,
-          },
-          voteHash: vote.voteHash,
-          blockHash: vote.blockHash,
-          timestamp: vote.timestamp,
-        }
-      }),
-    )
-
-    // Filtrer les votes nuls (élections ou candidats supprimés)
-    const validVotes = votesWithDetails.filter((vote) => vote !== null)
-
-    res.json(validVotes)
+    res.json(votes)
   } catch (error) {
-    console.error("Erreur de récupération des votes:", error)
-    res.status(500).json({ message: "Erreur serveur" })
+    console.error("Error getting user votes:", error)
+    res.status(500).json({ message: "Server error", error: error.message })
   }
 }
 
 // Obtenir l'état de la blockchain
 exports.getBlockchainStatus = async (req, res) => {
   try {
-    // Vérifier si l'utilisateur est admin
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ message: "Non autorisé" })
+    // Check if user is admin
+    if (req.user && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" })
     }
 
-    const chain = blockchainService.getFullBlockchain()
-    const isValid = blockchainService.verifyBlockchain()
+    const status = await blockchainService.getBlockchainStatus()
 
-    res.json({
-      chainLength: chain.length,
-      isValid,
-      latestBlock:
-        chain.length > 0
-          ? {
-              hash: chain[chain.length - 1].hash,
-              timestamp: chain[chain.length - 1].timestamp,
-              voteCount: chain[chain.length - 1].votes.length,
-            }
-          : null,
-      pendingVotes: blockchainService.getPendingVotesCount(),
-    })
+    // If an error is returned in the status object, send an appropriate error response
+    if (status.error) {
+      console.error("Blockchain error:", status.error)
+      return res.status(500).json({
+        message: "Error retrieving blockchain status",
+        error: status.error,
+      })
+    }
+
+    res.json(status)
   } catch (error) {
-    console.error("Erreur de récupération de l'état de la blockchain:", error)
-    res.status(500).json({ message: "Erreur serveur" })
+    console.error("Error getting blockchain status:", error)
+    res.status(500).json({
+      message: "Error retrieving blockchain status",
+      error: error.message,
+    })
   }
 }
 
+// Ajouter cette méthode au contrôleur
+exports.reinitializeBlockchain = async (req, res) => {
+  try {
+    // Check if user is admin
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized" })
+    }
+
+    // Delete existing blockchain
+    const Blockchain = require("../models/Blockchain")
+    await Blockchain.deleteMany({})
+
+    // Reinitialize blockchain
+    const blockchain = await blockchainService.initializeBlockchain()
+
+    res.json({
+      message: "Blockchain reinitialized successfully",
+      chainLength: blockchain.chain ? blockchain.chain.length : 0,
+    })
+  } catch (error) {
+    console.error("Error reinitializing blockchain:", error)
+    res.status(500).json({
+      message: "Error reinitializing blockchain",
+      error: error.message,
+    })
+  }
+}

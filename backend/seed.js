@@ -32,20 +32,20 @@ const users = [
     password: "password123",
     role: "admin",
   },
-  // {
-  //   name: "John Doe",
-  //   email: "john@example.com",
-  //   nationalId: "JD123456",
-  //   password: "password123",
-  //   role: "voter",
-  // },
-  // {
-  //   name: "Jane Smith",
-  //   email: "jane@example.com",
-  //   nationalId: "JS789012",
-  //   password: "password123",
-  //   role: "voter",
-  // },
+  {
+    name: "test1",
+    email: "test1@example.com",
+    nationalId: "JD123456",
+    password: "password123",
+    role: "voter",
+  },
+  {
+    name: "test2",
+    email: "test2@example.com",
+    nationalId: "JS789012",
+    password: "password123",
+    role: "voter",
+  },
 ]
 
 const elections = [

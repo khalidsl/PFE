@@ -35,18 +35,46 @@ const LoginPage = () => {
     setError(null)
 
     try {
-      const { success, message } = await login(formData.email, formData.password)
+      const { success, message, needsVerification } = await login(formData.email, formData.password)
 
       if (success) {
         toast.success("Connexion réussie")
         navigate(from, { replace: true })
+      } else if (needsVerification) {
+        // Rediriger vers la page de vérification OTP
+        navigate(`/verify-otp`, {
+          state: {
+            email: formData.email,
+            otpCode: message.otpCode,
+          },
+        })
       } else {
         setError(message)
         toast.error(message)
       }
     } catch (error) {
-      setError("Une erreur est survenue lors de la connexion")
-      toast.error("Une erreur est survenue lors de la connexion")
+      console.error("Erreur de connexion:", error)
+
+      // Vérifier si l'utilisateur doit vérifier son compte
+      if (error.response?.data?.needsVerification) {
+        // Rediriger vers la page de vérification OTP avec les informations nécessaires
+        navigate("/verify-otp", {
+          state: {
+            email: formData.email,
+            otpCode: error.response.data.otpCode,
+          },
+        })
+        return
+      }
+
+      // Gérer spécifiquement les erreurs de timeout
+      if (error.code === "ECONNABORTED") {
+        setError("La connexion au serveur a pris trop de temps. Veuillez réessayer.")
+        toast.error("Délai d'attente dépassé. Veuillez réessayer.")
+      } else {
+        setError("Une erreur est survenue lors de la connexion")
+        toast.error("Une erreur est survenue lors de la connexion")
+      }
     } finally {
       setLoading(false)
     }
@@ -91,7 +119,14 @@ const LoginPage = () => {
           </div>
 
           <button type="submit" disabled={loading} className="w-full btn btn-primary">
-            {loading ? "Connexion en cours..." : "Se connecter"}
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+                Connexion en cours...
+              </div>
+            ) : (
+              "Se connecter"
+            )}
           </button>
         </form>
       </div>
@@ -107,4 +142,3 @@ const LoginPage = () => {
 }
 
 export default LoginPage
-

@@ -7,16 +7,40 @@ const BlockchainStatus = () => {
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
     const fetchBlockchainStatus = async () => {
       try {
+        setLoading(true)
         const { data } = await votesApi.getBlockchainStatus()
         setStatus(data)
+        setError(null)
         setLoading(false)
       } catch (error) {
         console.error("Erreur de récupération du statut de la blockchain:", error)
-        setError("Impossible de charger le statut de la blockchain")
+
+        // Message d'erreur plus détaillé
+        let errorMessage = "Impossible de charger le statut de la blockchain"
+
+        if (error.response) {
+          // Le serveur a répondu avec un code d'erreur
+          errorMessage += ` (${error.response.status})`
+          if (error.response.data && error.response.data.message) {
+            errorMessage += `: ${error.response.data.message}`
+          }
+          if (error.response.data && error.response.data.error) {
+            errorMessage += ` - ${error.response.data.error}`
+          }
+        } else if (error.request) {
+          // La requête a été faite mais pas de réponse
+          errorMessage += ": Pas de réponse du serveur"
+        } else {
+          // Erreur lors de la configuration de la requête
+          errorMessage += `: ${error.message}`
+        }
+
+        setError(errorMessage)
         setLoading(false)
       }
     }
@@ -27,7 +51,34 @@ const BlockchainStatus = () => {
     const interval = setInterval(fetchBlockchainStatus, 30000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [retryCount])
+
+  const handleRetry = () => {
+    setRetryCount((prev) => prev + 1)
+  }
+
+  const handleReinitialize = async () => {
+    try {
+      setLoading(true)
+      // Appeler une route spéciale pour réinitialiser la blockchain
+      await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000/api"}/votes/blockchain/reinitialize`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      })
+
+      // Attendre un peu pour laisser le temps à la blockchain de s'initialiser
+      setTimeout(() => {
+        setRetryCount((prev) => prev + 1)
+      }, 2000)
+    } catch (error) {
+      console.error("Erreur lors de la réinitialisation:", error)
+      setError("Échec de la réinitialisation de la blockchain")
+      setLoading(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -38,7 +89,51 @@ const BlockchainStatus = () => {
   }
 
   if (error) {
-    return <div className="bg-red-100 text-red-700 p-4 rounded">{error}</div>
+    return (
+      <div className="bg-red-100 text-red-700 p-4 rounded mb-4">
+        <p className="font-semibold mb-2">{error}</p>
+        <p className="text-sm mb-3">
+          Le serveur blockchain pourrait être temporairement indisponible ou rencontrer des problèmes d'initialisation.
+        </p>
+        <div className="flex space-x-2">
+          <button onClick={handleRetry} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded text-sm">
+            Réessayer
+          </button>
+          <button
+            onClick={handleReinitialize}
+            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm"
+          >
+            Réinitialiser la blockchain
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Vérifier si le statut est valide
+  if (!status || !status.chainLength) {
+    return (
+      <div className="bg-yellow-100 text-yellow-700 p-4 rounded mb-4">
+        <p className="font-semibold mb-2">Données blockchain incomplètes</p>
+        <p className="text-sm mb-3">
+          Les informations de la blockchain ne sont pas complètes ou sont en cours d'initialisation.
+        </p>
+        <div className="flex space-x-2">
+          <button
+            onClick={handleRetry}
+            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm"
+          >
+            Actualiser
+          </button>
+          <button
+            onClick={handleReinitialize}
+            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm"
+          >
+            Réinitialiser la blockchain
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -92,4 +187,3 @@ const BlockchainStatus = () => {
 }
 
 export default BlockchainStatus
-

@@ -51,6 +51,15 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data } = await authApi.login({ email, password })
 
+      // Vérifier si l'email est vérifié
+      if (data.needsVerification) {
+        return {
+          success: false,
+          needsVerification: true,
+          message: data.message,
+        }
+      }
+
       // Stocker le token et les données utilisateur
       localStorage.setItem("token", data.token)
       localStorage.setItem("user", JSON.stringify(data))
@@ -62,6 +71,7 @@ export const AuthProvider = ({ children }) => {
       return {
         success: false,
         message: error.response?.data?.message || "Erreur de connexion",
+        needsVerification: error.response?.data?.needsVerification,
       }
     }
   }
@@ -76,7 +86,11 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("user", JSON.stringify(data))
 
       setUser(data)
-      return { success: true }
+      return {
+        success: true,
+        needsVerification: !data.isEmailVerified,
+        message: data.message,
+      }
     } catch (error) {
       console.error("Erreur d'inscription:", error)
       return {
@@ -110,7 +124,11 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("user", JSON.stringify(updatedUser))
       setUser(updatedUser)
 
-      return { success: true }
+      return {
+        success: true,
+        needsVerification: data.message && data.message.includes("vérification"),
+        message: data.message,
+      }
     } catch (error) {
       console.error("Erreur de mise à jour du profil:", error)
       return {
@@ -145,10 +163,10 @@ export const AuthProvider = ({ children }) => {
     updateVoteStatus,
     isAuthenticated: !!user,
     isAdmin: user?.role === "admin",
+    isEmailVerified: user?.isEmailVerified,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export default AuthContext
-

@@ -1,4 +1,4 @@
-# version: '3.8'
+version: '3.8'
 
 services:
   # Service MongoDB
@@ -40,6 +40,13 @@ services:
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - SESSION_SECRET=${SESSION_SECRET}
       - FRONTEND_URL=${FRONTEND_URL}
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - EMAIL_FROM=${EMAIL_FROM}
+      # Ajouter CORS pour permettre les connexions depuis le frontend
+      - CORS_ORIGIN=http://localhost:3000
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -59,6 +66,8 @@ services:
       - backend
     environment:
       - REACT_APP_API_URL=http://localhost:${PORT}/api
+      # Ajouter l'URL WebSocket
+      - REACT_APP_WS_URL=ws://localhost:${PORT}
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -71,4 +80,3 @@ volumes:
 networks:
   evoting-network:
     driver: bridge
-

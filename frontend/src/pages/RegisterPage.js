@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { useAuth } from "../context/AuthContext"
 import { toast } from "react-toastify"
+import { authApi } from "../services/api"
 
 const RegisterPage = () => {
   const [formData, setFormData] = useState({
@@ -16,8 +16,8 @@ const RegisterPage = () => {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [serverStatus, setServerStatus] = useState("idle") // 'idle', 'checking', 'available', 'unavailable'
 
-  const { register } = useAuth()
   const navigate = useNavigate()
 
   const handleChange = (e) => {
@@ -26,6 +26,34 @@ const RegisterPage = () => {
       ...formData,
       [name]: value,
     })
+  }
+
+  // Fonction pour vérifier si le serveur est disponible
+  const checkServerAvailability = async () => {
+    try {
+      setServerStatus("checking")
+      // Utiliser une route simple pour vérifier la disponibilité du serveur
+      const response = await fetch(`${process.env.REACT_APP_API_URL || "http://localhost:5000/api"}/health`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        // Timeout court pour la vérification
+        signal: AbortSignal.timeout(3000),
+      })
+
+      if (response.ok) {
+        setServerStatus("available")
+        return true
+      } else {
+        setServerStatus("unavailable")
+        return false
+      }
+    } catch (error) {
+      console.error("Erreur de vérification du serveur:", error)
+      setServerStatus("unavailable")
+      return false
+    }
   }
 
   const handleSubmit = async (e) => {
@@ -40,24 +68,49 @@ const RegisterPage = () => {
       return
     }
 
+    // Vérifier d'abord si le serveur est disponible
+    const isServerAvailable = await checkServerAvailability()
+    if (!isServerAvailable) {
+      setError("Le serveur est actuellement indisponible. Veuillez réessayer plus tard.")
+      setLoading(false)
+      toast.error("Impossible de se connecter au serveur")
+      return
+    }
+
     try {
-      const { success, message } = await register({
+      const response = await authApi.register({
         name: formData.name,
         email: formData.email,
         nationalId: formData.nationalId,
         password: formData.password,
       })
 
-      if (success) {
-        toast.success("Inscription réussie")
-        navigate("/")
+      toast.success("Inscription réussie")
+
+      // Vérifier si la vérification est requise
+      if (response.data.requiresVerification) {
+        // Rediriger vers la page de vérification OTP
+        navigate("/verify-otp", {
+          state: {
+            email: formData.email,
+            otpCode: response.data.otpCode,
+          },
+        })
       } else {
-        setError(message)
-        toast.error(message)
+        // Rediriger vers la page d'accueil
+        navigate("/")
       }
     } catch (error) {
-      setError("Une erreur est survenue lors de l'inscription")
-      toast.error("Une erreur est survenue lors de l'inscription")
+      console.error("Erreur d'inscription:", error)
+
+      // Message d'erreur personnalisé pour les timeouts
+      if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
+        setError("Le serveur met trop de temps à répondre. Veuillez réessayer plus tard.")
+        toast.error("Délai d'attente dépassé")
+      } else {
+        setError(error.response?.data?.message || "Une erreur est survenue lors de l'inscription")
+        toast.error(error.response?.data?.message || "Erreur d'inscription")
+      }
     } finally {
       setLoading(false)
     }
@@ -68,6 +121,12 @@ const RegisterPage = () => {
       <h1 className="text-3xl font-bold mb-6 text-center">Inscription</h1>
 
       {error && <div className="bg-red-100 text-red-700 p-4 rounded mb-4">{error}</div>}
+
+      {serverStatus === "unavailable" && (
+        <div className="bg-yellow-100 text-yellow-800 p-4 rounded mb-4">
+          Le serveur semble être indisponible. Vos données pourraient ne pas être enregistrées.
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <form onSubmit={handleSubmit} className="p-6">
@@ -148,7 +207,14 @@ const RegisterPage = () => {
           </div>
 
           <button type="submit" disabled={loading} className="w-full btn btn-primary">
-            {loading ? "Inscription en cours..." : "S'inscrire"}
+            {loading ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+                Inscription en cours...
+              </div>
+            ) : (
+              "S'inscrire"
+            )}
           </button>
         </form>
       </div>
@@ -164,4 +230,3 @@ const RegisterPage = () => {
 }
 
 export default RegisterPage
-

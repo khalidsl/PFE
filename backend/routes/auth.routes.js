@@ -17,6 +17,14 @@ router.post("/register", registerValidation, authController.register)
 router.post("/login", authController.login)
 router.post("/logout", authController.logout)
 
+// Nouvelles routes pour OTP
+router.post("/verify-otp", authController.verifyOTP)
+router.post("/resend-otp", authController.resendOTP)
+
+// Anciennes routes de vérification d'email (conservées pour rétrocompatibilité)
+router.get("/verify-email/:token", authController.verifyEmail)
+router.post("/resend-verification", authController.resendVerificationEmail)
+
 // Routes protégées
 router.get("/profile", authenticateJWT, authController.getProfile)
 router.put("/profile", authenticateJWT, authController.updateProfile)
