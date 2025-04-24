@@ -14,12 +14,48 @@ const voteValidation = [
 
 // Routes protégées
 router.post("/", authenticateJWT, voteValidation, voteController.castVote)
-router.get("/results/:id", voteController.getElectionResults)
-router.get("/verify/:id", authenticateJWT, voteController.verifyVote)
-router.get("/user", authenticateJWT, voteController.getUserVotes)
+// Correction de la ligne 17 - Assurez-vous que le contrôleur existe
+router.get(
+  "/results/:id",
+  voteController.getElectionResults ||
+    ((req, res) => {
+      res.status(501).json({ message: "Fonctionnalité non implémentée" })
+    }),
+)
+router.get(
+  "/verify/:id",
+  authenticateJWT,
+  voteController.verifyVote ||
+    ((req, res) => {
+      res.status(501).json({ message: "Fonctionnalité non implémentée" })
+    }),
+)
+router.get(
+  "/user",
+  authenticateJWT,
+  voteController.getUserVotes ||
+    ((req, res) => {
+      res.status(501).json({ message: "Fonctionnalité non implémentée" })
+    }),
+)
 
 // Routes blockchain (admin seulement)
-router.get("/blockchain/status", authenticateJWT, voteController.getBlockchainStatus)
-router.post("/blockchain/reinitialize", authenticateJWT, isAdmin, voteController.reinitializeBlockchain)
+router.get(
+  "/blockchain/status",
+  authenticateJWT,
+  voteController.getBlockchainStatus ||
+    ((req, res) => {
+      res.status(501).json({ message: "Fonctionnalité non implémentée" })
+    }),
+)
+router.post(
+  "/blockchain/reinitialize",
+  authenticateJWT,
+  isAdmin,
+  voteController.reinitializeBlockchain ||
+    ((req, res) => {
+      res.status(501).json({ message: "Fonctionnalité non implémentée" })
+    }),
+)
 
 module.exports = router

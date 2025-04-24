@@ -76,8 +76,7 @@ const ElectionDetailsPage = () => {
         <div className="bg-green-100 text-green-800 p-4 rounded mb-6">
           <h3 className="font-bold text-lg mb-2">Vérification du vote</h3>
           <p>Votre vote a été enregistré et vérifié avec succès.</p>
-          <p className="text-sm mt-2">Hash du vote: {voteVerification.vote.voteHash}</p>
-
+          {/* <p className="text-sm mt-2">Hash du vote: {voteVerification.vote.voteHash}</p> */}
           {/* Afficher les informations de la blockchain */}
           <BlockchainVerification blockchainData={voteVerification.blockchain} />
         </div>

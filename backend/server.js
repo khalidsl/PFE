@@ -24,14 +24,22 @@ app.use(express.json())
 app.use(cookieParser())
 app.use(morgan("dev"))
 
-// Configuration CORS améliorée
+// Configuration CORS améliorée - accepter toutes les origines en développement
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN || process.env.FRONTEND_URL || "http://localhost:3000",
+  origin: process.env.FRONTEND_URL || "http://localhost:3000", // Spécifier l'origine exacte au lieu du wildcard
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
 }
+
+// Appliquer CORS avant les routes
 app.use(cors(corsOptions))
+
+// Log des requêtes entrantes
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`)
+  next()
+})
 
 // Servir les fichiers statiques
 app.use(express.static(path.join(__dirname, "public")))
@@ -88,54 +96,69 @@ const connectDB = async () => {
     return conn
   } catch (error) {
     console.error(`Erreur de connexion à MongoDB: ${error.message}`)
-    process.exit(1)
+    console.log("L'application continuera sans connexion à la base de données")
+    // Ne pas quitter le processus pour permettre au serveur de démarrer même sans DB
+    // process.exit(1)
   }
 }
 
 // Démarrage du serveur
-connectDB().then(() => {
-  const PORT = process.env.PORT || 5000
-  const server = app.listen(PORT, () => {
-    console.log(`Serveur démarré sur le port ${PORT}`)
-  })
-
-  // Gestion des erreurs du serveur
-  server.on("error", (error) => {
-    console.error("Erreur du serveur:", error)
-  })
-
-  // Planifier le minage des blocs toutes les 60 secondes
+const startServer = async () => {
   try {
-    const blockchainService = require("./services/blockchain.service")
-    setInterval(
-      async () => {
-        try {
-          console.log("Tentative de minage des votes en attente...")
-          const newBlock = await blockchainService.mineVotes()
-          if (newBlock) {
-            console.log(`Nouveau bloc miné: ${newBlock.hash}`)
+    // Tenter de se connecter à MongoDB, mais continuer même en cas d'échec
+    await connectDB().catch((err) => {
+      console.error("Impossible de se connecter à MongoDB, mais le serveur continuera:", err.message)
+    })
 
-            // Mettre à jour les votes avec les informations du bloc
-            const Vote = require("./models/Vote")
-            await Vote.updateMany(
-              { blockHash: { $exists: false } },
-              {
-                blockHash: newBlock.hash,
-                blockIndex: newBlock.index,
-              },
-            )
-          } else {
-            console.log("Aucun nouveau bloc miné (pas de votes en attente)")
+    const PORT = process.env.PORT || 5000
+    const server = app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Serveur démarré sur le port ${PORT}`)
+      console.log(`API accessible à http://localhost:${PORT}/api/health`)
+    })
+
+    // Gestion des erreurs du serveur
+    server.on("error", (error) => {
+      console.error("Erreur du serveur:", error)
+    })
+
+    // Planifier le minage des blocs toutes les 60 secondes
+    try {
+      const blockchainService = require("./services/blockchain.service")
+      setInterval(
+        async () => {
+          try {
+            console.log("Tentative de minage des votes en attente...")
+            const newBlock = await blockchainService.mineVotes()
+            if (newBlock) {
+              console.log(`Nouveau bloc miné: ${newBlock.hash}`)
+
+              // Mettre à jour les votes avec les informations du bloc
+              const Vote = require("./models/Vote")
+              await Vote.updateMany(
+                { blockHash: { $exists: false } },
+                {
+                  blockHash: newBlock.hash,
+                  blockIndex: newBlock.index,
+                },
+              )
+            } else {
+              console.log("Aucun nouveau bloc miné (pas de votes en attente)")
+            }
+          } catch (error) {
+            console.error("Erreur lors du minage planifié:", error)
           }
-        } catch (error) {
-          console.error("Erreur lors du minage planifié:", error)
-        }
-      },
-      60 * 1000, // 60 secondes
-    )
+        },
+        60 * 1000, // 60 secondes
+      )
+    } catch (error) {
+      console.error("Erreur lors de l'initialisation du service de minage:", error)
+    }
   } catch (error) {
-    console.error("Erreur lors de l'initialisation du service de minage:", error)
+    console.error("Erreur lors du démarrage du serveur:", error)
   }
-})
+}
+
+// Démarrer le serveur
+startServer()
 
 module.exports = app

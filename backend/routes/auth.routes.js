@@ -22,8 +22,15 @@ router.post("/verify-otp", authController.verifyOTP)
 router.post("/resend-otp", authController.resendOTP)
 
 // Anciennes routes de vérification d'email (conservées pour rétrocompatibilité)
-router.get("/verify-email/:token", authController.verifyEmail)
-router.post("/resend-verification", authController.resendVerificationEmail)
+// Correction de la ligne 25 - Assurez-vous que le contrôleur existe
+router.get(
+  "/verify-email/:token",
+  authController.verifyEmail || ((req, res) => res.status(501).json({ message: "Non implémenté" })),
+)
+router.post(
+  "/resend-verification",
+  authController.resendVerificationEmail || ((req, res) => res.status(501).json({ message: "Non implémenté" })),
+)
 
 // Routes protégées
 router.get("/profile", authenticateJWT, authController.getProfile)

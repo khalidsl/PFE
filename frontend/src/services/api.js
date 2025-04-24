@@ -1,7 +1,11 @@
 import axios from "axios"
 
 // URL de base de l'API - Utiliser l'URL complète pour éviter les problèmes CORS
-const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api"
+// Modifier pour utiliser le nom du service Docker au lieu de localhost
+const API_URL = process.env.REACT_APP_API_URL || 
+                (window.location.hostname === 'localhost' ? 
+                "http://localhost:5000/api" : 
+                "http://backend:5000/api")
 
 // Instance axios pour les requêtes d'authentification
 const authInstance = axios.create({

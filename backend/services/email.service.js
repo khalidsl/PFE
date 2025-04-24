@@ -5,16 +5,21 @@ require("dotenv").config()
 const createTransporter = async () => {
   // Récupérer les informations de configuration depuis les variables d'environnement
   const config = {
-    host: process.env.EMAIL_HOST || "smtp.ethereal.email",
-    port: process.env.EMAIL_PORT || "587",
-    secure: false, // true pour 465, false pour les autres ports
+    host: process.env.EMAIL_HOST || "smtp.gmail.com",
+    port: process.env.EMAIL_PORT || 587,
+    secure: process.env.EMAIL_PORT === "465", // true pour 465, false pour les autres ports
     auth: {
-      user: process.env.EMAIL_USER || "melany44@ethereal.email",
-      pass: process.env.EMAIL_PASSWORD || "caa8ZzG2uPsRgjGzw6",
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
     },
   }
 
-  console.log("Configuration email:", config)
+  console.log("Configuration email:", {
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    user: config.auth.user ? "configuré" : "non configuré",
+  })
 
   // Créer un transporteur réutilisable
   const transporter = nodemailer.createTransport(config)
@@ -46,6 +51,7 @@ const createTransporter = async () => {
       })
 
       console.log("Compte de test Ethereal créé:", testAccount.user)
+      console.log("URL de prévisualisation Ethereal:", nodemailer.getTestMessageUrl)
       return etherealTransporter
     }
 
@@ -104,70 +110,66 @@ const sendEmail = async (options) => {
   }
 }
 
-// Envoyer un email de vérification
-const sendVerificationEmail = async (user, token) => {
+// Envoyer un email avec un code OTP
+const sendOTPEmail = async (user, otpCode, validityMinutes) => {
   // En mode développement, on peut simuler l'envoi
   if (process.env.NODE_ENV === "development") {
-    console.log(`[DEV] Email de vérification pour ${user.email} avec token: ${token}`)
-    console.log(
-      `[DEV] URL de vérification: ${process.env.FRONTEND_URL || "http://localhost:3000"}/verify-email?token=${token}`,
-    )
+    console.log(`[DEV] Email OTP pour ${user.email} avec code: ${otpCode}`)
+    console.log(`[DEV] Le code est valide pendant ${validityMinutes} minutes`)
     return { success: true, dev: true }
   }
 
-  const verificationUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/verify-email?token=${token}`
-
   await sendEmail({
     to: user.email,
-    subject: "Vérification de votre adresse email",
+    subject: "Votre code de vérification",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #3b82f6;">Vérification de votre adresse email</h2>
+        <h2 style="color: #3b82f6;">Code de vérification</h2>
         <p>Bonjour ${user.name},</p>
-        <p>Merci de vous être inscrit sur notre système de vote électronique. Pour activer votre compte, veuillez cliquer sur le lien ci-dessous :</p>
-        <p style="margin: 20px 0;">
-          <a href="${verificationUrl}" style="background-color: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Vérifier mon email</a>
-        </p>
-        <p>Ou copiez et collez ce lien dans votre navigateur :</p>
-        <p style="word-break: break-all;">${verificationUrl}</p>
-        <p>Ce lien expirera dans 24 heures.</p>
-        <p>Si vous n'avez pas créé de compte, vous pouvez ignorer cet email.</p>
+        <p>Voici votre code de vérification pour le système de vote électronique:</p>
+        <div style="background-color: #f3f4f6; padding: 20px; text-align: center; margin: 20px 0;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px;">${otpCode}</span>
+        </div>
+        <p>Ce code est valable pendant ${validityMinutes} minutes.</p>
+        <p>Si vous n'avez pas demandé ce code, vous pouvez ignorer cet email.</p>
         <p>Cordialement,<br>L'équipe E-Voting</p>
       </div>
     `,
   })
+
+  return { success: true }
 }
 
-// Envoyer un email de confirmation de connexion
-const sendLoginConfirmationEmail = async (user) => {
+// Envoyer un email de confirmation de vote
+const sendVoteConfirmationEmail = async (user, electionTitle, candidateName) => {
   // En mode développement, on peut simuler l'envoi
   if (process.env.NODE_ENV === "development") {
-    console.log(`[DEV] Email de confirmation de connexion pour ${user.email}`)
+    console.log(`[DEV] Email de confirmation de vote pour ${user.email}`)
+    console.log(`[DEV] Élection: ${electionTitle}, Candidat: ${candidateName}`)
     return { success: true, dev: true }
   }
 
-  try {
-    await sendEmail({
-      to: user.email,
-      subject: "Confirmation de connexion",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #3b82f6;">Confirmation de connexion</h2>
-          <p>Bonjour ${user.name},</p>
-          <p>Nous vous informons qu'une connexion à votre compte a été effectuée le ${new Date().toLocaleString()}.</p>
-          <p>Si vous n'êtes pas à l'origine de cette connexion, veuillez immédiatement changer votre mot de passe et contacter notre support.</p>
-          <p>Cordialement,<br>L'équipe E-Voting</p>
-        </div>
-      `,
-    })
-  } catch (error) {
-    // Capturer l'erreur mais ne pas la propager pour ne pas bloquer la connexion
-    console.error("Erreur d'envoi d'email de confirmation:", error)
-  }
+  await sendEmail({
+    to: user.email,
+    subject: "Confirmation de vote",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #3b82f6;">Confirmation de vote</h2>
+        <p>Bonjour ${user.name},</p>
+        <p>Nous confirmons que votre vote pour l'élection <strong>${electionTitle}</strong> a été enregistré avec succès.</p>
+        <p>Vous avez voté pour: <strong>${candidateName}</strong></p>
+        <p>Date et heure du vote: ${new Date().toLocaleString()}</p>
+        <p>Merci de votre participation!</p>
+        <p>Cordialement,<br>L'équipe E-Voting</p>
+      </div>
+    `,
+  })
+
+  return { success: true }
 }
 
 module.exports = {
   sendEmail,
-  sendVerificationEmail,
-  sendLoginConfirmationEmail,
+  sendOTPEmail,
+  sendVoteConfirmationEmail,
 }
