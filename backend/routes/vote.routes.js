@@ -12,6 +12,10 @@ const voteValidation = [
   body("candidateId").notEmpty().withMessage("ID de candidat requis"),
 ]
 
+// Routes for admin dashboard - Assurez-vous que ces routes sont correctement configurées
+router.get("/recent", authenticateJWT, isAdmin, voteController.getRecentVotes) // Route pour les votes récents
+router.get("/dashboard/stats", authenticateJWT, isAdmin, voteController.getDashboardStats) // Stats du tableau de bord
+
 // Routes protégées
 router.post("/", authenticateJWT, voteValidation, voteController.castVote)
 // Correction de la ligne 17 - Assurez-vous que le contrôleur existe

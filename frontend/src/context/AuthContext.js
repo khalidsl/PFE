@@ -46,6 +46,33 @@ export const AuthProvider = ({ children }) => {
     loadUser()
   }, [])
 
+  // Fonction pour rafraîchir le token JWT
+  const refreshToken = async () => {
+    try {
+      // Appel à l'API pour rafraîchir le token
+      const { data } = await authApi.refreshToken()
+      
+      // Mettre à jour le token dans localStorage
+      localStorage.setItem("token", data.token)
+      
+      // Mettre à jour les données utilisateur si nécessaire
+      if (data.user) {
+        const updatedUser = { ...user, ...data.user }
+        localStorage.setItem("user", JSON.stringify(updatedUser))
+        setUser(updatedUser)
+      }
+      
+      return true
+    } catch (error) {
+      console.error("Erreur lors du rafraîchissement du token:", error)
+      // Si le rafraîchissement échoue, on déconnecte l'utilisateur
+      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+        logout()
+      }
+      return false
+    }
+  }
+
   // Fonction de connexion
   const login = async (email, password) => {
     try {
@@ -161,6 +188,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateProfile,
     updateVoteStatus,
+    refreshToken, // Ajouter la fonction refreshToken
     isAuthenticated: !!user,
     isAdmin: user?.role === "admin",
     isEmailVerified: user?.isEmailVerified,

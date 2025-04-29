@@ -15,6 +15,7 @@ const authRoutes = require("./routes/auth.routes")
 const electionRoutes = require("./routes/election.routes")
 const voteRoutes = require("./routes/vote.routes")
 const healthRoutes = require("./routes/health.routes")
+const dashboardRoutes = require("./routes/dashboard.routes") // Nouvelle route pour le tableau de bord
 
 // Initialisation de l'application Express
 const app = express()
@@ -49,6 +50,7 @@ app.use("/api/auth", authRoutes)
 app.use("/api/elections", electionRoutes)
 app.use("/api/votes", voteRoutes)
 app.use("/api/health", healthRoutes)
+app.use("/api/dashboard", dashboardRoutes) // Route pour le dashboard administrateur
 
 // Route de test pour vérifier que l'API fonctionne
 app.get("/api/health", (req, res) => {

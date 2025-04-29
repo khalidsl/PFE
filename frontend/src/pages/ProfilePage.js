@@ -6,7 +6,7 @@ import { useAuth } from "../context/AuthContext"
 import { authApi, electionsApi } from "../services/api"
 
 const ProfilePage = () => {
-  const { user, updateProfile } = useAuth()
+  const { user } = useAuth()
 
   const [votingHistory, setVotingHistory] = useState([])
   const [loading, setLoading] = useState(true)

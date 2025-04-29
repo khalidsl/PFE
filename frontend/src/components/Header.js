@@ -1,11 +1,11 @@
-"use client"
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 
 const Header = () => {
-  const { user, isAuthenticated, isAdmin, logout } = useAuth()
   const navigate = useNavigate()
-
+  const { logout, isAuthenticated, isAdmin } = useAuth()
+  // Enlever 'user' de la déstructuration puisqu'il n'est pas utilisé
+  
   const handleLogout = async () => {
     await logout()
     navigate("/login")

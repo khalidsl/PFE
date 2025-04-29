@@ -8,7 +8,7 @@ const crypto = require("crypto")
 //  token JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
+    expiresIn: "24h", // Augmenter la durée de validité du token de 1h à 24h
   })
 }
 
@@ -499,5 +499,37 @@ exports.resendVerificationEmail = async (req, res) => {
   } catch (error) {
     console.error("Erreur de renvoi d'email de vérification:", error)
     res.status(500).json({ message: "Erreur serveur", error: error.message })
+  }
+}
+
+// Rafraîchir le token JWT
+exports.refreshToken = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user) {
+      return res.status(404).json({ message: "Utilisateur non trouvé" });
+    }
+    
+    // Générer un nouveau token
+    const token = generateToken(user._id);
+    
+    // Renvoyer le nouveau token
+    res.json({
+      message: "Token rafraîchi avec succès",
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        nationalId: user.nationalId,
+        role: user.role,
+        hasVoted: user.hasVoted,
+        isEmailVerified: user.isEmailVerified
+      }
+    });
+  } catch (error) {
+    console.error("Erreur de rafraîchissement du token:", error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
   }
 }

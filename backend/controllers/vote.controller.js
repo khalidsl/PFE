@@ -247,3 +247,126 @@ exports.reinitializeBlockchain = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message })
   }
 }
+
+// Get recent votes (for admin dashboard)
+exports.getRecentVotes = async (req, res) => {
+  try {
+    // Vérifier si l'utilisateur est admin
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Non autorisé" });
+    }
+
+    // Récupérer les 10 votes les plus récents avec leurs informations associées
+    const votes = await Vote.find()
+      .sort({ timestamp: -1 })
+      .limit(10)
+      .populate("voter", "name email")
+      .lean();
+
+    // Enrichir les votes avec des informations supplémentaires
+    const enrichedVotes = await Promise.all(
+      votes.map(async (vote) => {
+        try {
+          const election = await Election.findById(vote.election);
+          const candidate = election?.candidates.find(c => c._id.toString() === vote.candidate.toString());
+          
+          // Créer un avatar basé sur les initiales du nom de l'électeur
+          const voterName = vote.voter?.name || "Anonymous User";
+          const initials = voterName
+            .split(' ')
+            .map(name => name[0])
+            .join('')
+            .toUpperCase();
+          
+          return {
+            _id: vote._id,
+            electionId: vote.election,
+            electionTitle: election ? election.title : "Élection inconnue",
+            candidateId: vote.candidate,
+            candidateName: candidate ? candidate.name : "Candidat inconnu",
+            voterName: voterName,
+            voterAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(voterName)}&background=random`,
+            timestamp: vote.timestamp,
+          };
+        } catch (mapError) {
+          console.error("Erreur lors du traitement d'un vote:", mapError);
+          // Retourner une version simplifiée en cas d'erreur
+          return {
+            _id: vote._id,
+            electionId: vote.election,
+            electionTitle: "Élection inconnue",
+            candidateId: vote.candidate,
+            candidateName: "Candidat inconnu",
+            voterName: "Utilisateur inconnu",
+            voterAvatar: `https://ui-avatars.com/api/?name=?&background=random`,
+            timestamp: vote.timestamp,
+          };
+        }
+      })
+    );
+
+    res.json(enrichedVotes);
+  } catch (error) {
+    console.error("Erreur lors de la récupération des votes récents:", error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+};
+
+// Get dashboard statistics
+exports.getDashboardStats = async (req, res) => {
+  try {
+    // Vérifier si l'utilisateur est admin
+    if (!req.user || req.user.role !== "admin") {
+      return res.status(403).json({ message: "Non autorisé" });
+    }
+
+    // Date actuelle
+    const now = new Date();
+    
+    // Récupérer toutes les élections
+    const elections = await Election.find();
+    
+    // Compter le nombre de votes total
+    const totalVotes = await Vote.countDocuments();
+    
+    // Compter le nombre d'électeurs uniques (utilisateurs qui ont voté)
+    // Correction: hasVoted est un Map, pas un tableau, donc $size ne fonctionne pas
+    const totalVoters = await User.countDocuments({ "hasVoted": { $exists: true, $ne: {} } });
+    
+    try {
+      // Déterminer les élections actives et terminées
+      const activeElections = elections.filter(e => 
+        new Date(e.startDate) <= now && 
+        new Date(e.endDate) >= now && 
+        e.isActive
+      ).length;
+      
+      const completedElections = elections.filter(e => 
+        new Date(e.endDate) < now
+      ).length;
+      
+      // Statistiques à renvoyer
+      const stats = {
+        totalVotes,
+        totalVoters,
+        activeElections,
+        completedElections
+      };
+      
+      res.json(stats);
+    } catch (innerError) {
+      console.error("Erreur lors du calcul des statistiques:", innerError);
+      
+      // Envoyer des statistiques de base en cas d'erreur de calcul
+      res.json({
+        totalVotes: totalVotes || 0,
+        totalVoters: totalVoters || 0,
+        activeElections: 0,
+        completedElections: 0
+      });
+    }
+  } catch (error) {
+    console.error("Erreur lors de la récupération des statistiques du tableau de bord:", error);
+    res.status(500).json({ message: "Erreur serveur", error: error.message });
+  }
+};

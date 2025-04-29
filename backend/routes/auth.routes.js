@@ -17,6 +17,9 @@ router.post("/register", registerValidation, authController.register)
 router.post("/login", authController.login)
 router.post("/logout", authController.logout)
 
+// Route de rafraîchissement de token
+router.post("/refresh-token", authenticateJWT, authController.refreshToken)
+
 // Nouvelles routes pour OTP
 router.post("/verify-otp", authController.verifyOTP)
 router.post("/resend-otp", authController.resendOTP)

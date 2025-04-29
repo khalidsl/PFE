@@ -73,6 +73,7 @@ export const authApi = {
   logout: () => authInstance.post("/auth/logout"),
   getProfile: () => apiInstance.get("/auth/profile"),
   updateProfile: (userData) => apiInstance.put("/auth/profile", userData),
+  refreshToken: () => authInstance.post("/auth/refresh-token"),
   // Nouvelles routes OTP
   verifyOTP: (data) => authInstance.post("/auth/verify-otp", data),
   resendOTP: (data) => authInstance.post("/auth/resend-otp", data),

@@ -7,6 +7,7 @@ const ElectionCard = ({ election }) => {
   const endDate = new Date(election.endDate)
   const isActive = now >= startDate && now <= endDate && election.isActive
   const isPast = now > endDate
+  // eslint-disable-next-line no-unused-vars
   const isFuture = now < startDate
 
   return (
