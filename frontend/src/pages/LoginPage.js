@@ -82,7 +82,7 @@ const LoginPage = () => {
 
   return (
     <div className="max-w-md mx-auto">
-      <h1 className="text-3xl font-bold mb-6 text-center">Connexion</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center text-purple-600">Connexion</h1>
 
       {error && <div className="bg-red-100 text-red-700 p-4 rounded mb-4">{error}</div>}
 
@@ -99,6 +99,7 @@ const LoginPage = () => {
               value={formData.email}
               onChange={handleChange}
               className="form-input"
+              placeholder="Entrez votre email"
               required
             />
           </div>
@@ -114,11 +115,12 @@ const LoginPage = () => {
               value={formData.password}
               onChange={handleChange}
               className="form-input"
+              placeholder="Entrez votre mot de passe"
               required
             />
           </div>
 
-          <button type="submit" disabled={loading} className="w-full btn btn-primary">
+          <button type="submit" disabled={loading} className="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded font-medium transition-colors">
             {loading ? (
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>

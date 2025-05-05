@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { electionsApi } from "../services/api"
 import { toast } from "react-toastify"
 
 const CreateElectionPage = () => {
   const navigate = useNavigate()
+  const fileInputRefs = useRef([])
 
   const [formData, setFormData] = useState({
     title: "",
@@ -14,7 +15,7 @@ const CreateElectionPage = () => {
     startDate: "",
     endDate: "",
     isActive: false,
-    candidates: [{ name: "", party: "", bio: "", imageUrl: "" }],
+    candidates: [{ name: "", party: "", bio: "", imageUrl: "", imageFile: null, imagePreview: null }],
   })
 
   const [loading, setLoading] = useState(false)
@@ -39,10 +40,41 @@ const CreateElectionPage = () => {
     })
   }
 
+  const handleImageChange = (index, e) => {
+    const file = e.target.files[0]
+    if (!file) return;
+    
+    // Vérifications sur le type et la taille du fichier
+    const validImageTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+    const maxSizeInMB = 5;
+    
+    if (!validImageTypes.includes(file.type)) {
+      toast.error("Format d'image non supporté. Utilisez JPEG, PNG ou GIF.");
+      return;
+    }
+    
+    if (file.size > maxSizeInMB * 1024 * 1024) {
+      toast.error(`L'image est trop volumineuse. Taille maximale: ${maxSizeInMB}MB`);
+      return;
+    }
+    
+    const updatedCandidates = [...formData.candidates]
+    updatedCandidates[index] = {
+      ...updatedCandidates[index],
+      imageFile: file,
+      imagePreview: URL.createObjectURL(file),
+    }
+
+    setFormData({
+      ...formData,
+      candidates: updatedCandidates,
+    })
+  }
+
   const addCandidate = () => {
     setFormData({
       ...formData,
-      candidates: [...formData.candidates, { name: "", party: "", bio: "", imageUrl: "" }],
+      candidates: [...formData.candidates, { name: "", party: "", bio: "", imageUrl: "", imageFile: null, imagePreview: null }],
     })
   }
 
@@ -62,12 +94,65 @@ const CreateElectionPage = () => {
     setError(null)
 
     try {
-      // Formater les dates pour l'API
-      const apiData = {
+      // Préparation des données pour l'API
+      let apiData = {
         ...formData,
         startDate: new Date(formData.startDate).toISOString(),
         endDate: new Date(formData.endDate).toISOString(),
       }
+      
+      // Traitement des images de candidats (si présentes)
+      const candidatesWithImages = await Promise.all(
+        formData.candidates.map(async (candidate) => {
+          // Si l'utilisateur a téléchargé une image
+          if (candidate.imageFile) {
+            try {
+              // Créer un FormData pour l'upload
+              const imageFormData = new FormData();
+              imageFormData.append('image', candidate.imageFile);
+              
+              // Appel API pour télécharger l'image (à adapter selon votre API)
+              const response = await fetch('/api/upload-image', {
+                method: 'POST',
+                body: imageFormData,
+              });
+              
+              if (!response.ok) throw new Error('Échec du téléchargement de l\'image');
+              
+              const data = await response.json();
+              // Retourner le candidat avec l'URL de l'image mise à jour
+              return {
+                ...candidate,
+                imageUrl: data.imageUrl || candidate.imageUrl,
+                // Suppression des propriétés temporaires
+                imageFile: undefined,
+                imagePreview: undefined,
+              };
+            } catch (error) {
+              console.error("Erreur lors du téléchargement de l'image:", error);
+              // En cas d'erreur, on garde l'URL existante si disponible
+              return {
+                ...candidate,
+                imageFile: undefined,
+                imagePreview: undefined,
+              };
+            }
+          }
+          
+          // Si pas d'image téléchargée, on retourne le candidat tel quel sans les props temporaires
+          return {
+            ...candidate,
+            imageFile: undefined,
+            imagePreview: undefined,
+          };
+        })
+      );
+      
+      // Mise à jour des données avec les nouvelles URLs d'images
+      apiData = {
+        ...apiData,
+        candidates: candidatesWithImages,
+      };
 
       await electionsApi.create(apiData)
       toast.success("Élection créée avec succès")
@@ -228,7 +313,7 @@ const CreateElectionPage = () => {
                   ></textarea>
                 </div>
 
-                <div>
+                <div className="mb-3">
                   <label className="block text-gray-700 text-sm font-medium mb-1">URL de l'image</label>
                   <input
                     type="text"
@@ -238,6 +323,23 @@ const CreateElectionPage = () => {
                     className="form-input"
                     placeholder="https://example.com/image.jpg"
                   />
+                </div>
+
+                <div className="mb-3">
+                  <label className="block text-gray-700 text-sm font-medium mb-1">Importer une photo</label>
+                  <input
+                    type="file"
+                    ref={(el) => (fileInputRefs.current[index] = el)}
+                    onChange={(e) => handleImageChange(index, e)}
+                    className="form-input"
+                  />
+                  {candidate.imagePreview && (
+                    <img
+                      src={candidate.imagePreview}
+                      alt={`Preview ${index + 1}`}
+                      className="mt-2 max-h-32"
+                    />
+                  )}
                 </div>
               </div>
             ))}

@@ -118,7 +118,7 @@ const RegisterPage = () => {
 
   return (
     <div className="max-w-md mx-auto">
-      <h1 className="text-3xl font-bold mb-6 text-center">Inscription</h1>
+      <h1 className="text-3xl font-bold mb-6 text-center text-purple-600">Inscription</h1>
 
       {error && <div className="bg-red-100 text-red-700 p-4 rounded mb-4">{error}</div>}
 
@@ -141,6 +141,7 @@ const RegisterPage = () => {
               value={formData.name}
               onChange={handleChange}
               className="form-input"
+              placeholder="Nom complet"
               required
             />
           </div>
@@ -156,6 +157,7 @@ const RegisterPage = () => {
               value={formData.email}
               onChange={handleChange}
               className="form-input"
+              placeholder="user@email.com"
               required
             />
           </div>
@@ -171,6 +173,7 @@ const RegisterPage = () => {
               value={formData.nationalId}
               onChange={handleChange}
               className="form-input"
+              placeholder="A112233"
               required
             />
           </div>
@@ -186,6 +189,7 @@ const RegisterPage = () => {
               value={formData.password}
               onChange={handleChange}
               className="form-input"
+              placeholder="Minimum 6 caractères"
               required
               minLength="6"
             />
@@ -202,11 +206,12 @@ const RegisterPage = () => {
               value={formData.confirmPassword}
               onChange={handleChange}
               className="form-input"
+              placeholder="Répétez votre mot de passe"
               required
             />
           </div>
 
-          <button type="submit" disabled={loading} className="w-full btn btn-primary">
+          <button type="submit" disabled={loading} className="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded font-medium transition-colors">
             {loading ? (
               <div className="flex items-center justify-center">
                 <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>

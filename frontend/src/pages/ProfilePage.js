@@ -72,6 +72,8 @@ const ProfilePage = () => {
     <div className="max-w-4xl mx-auto">
       <h1 className="text-3xl font-bold mb-6">Mon Profil</h1>
 
+      
+
       <div className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
         <div className="bg-blue-600 text-white p-6">
           <h2 className="text-2xl font-semibold">{user.name}</h2>

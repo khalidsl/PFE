@@ -23,6 +23,9 @@ import BlockchainStatusPage from "./pages/BlockchainStatusPage"
 import VerifyEmailPage from "./pages/VerifyEmailPage"
 import ResendVerificationPage from "./pages/ResendVerificationPage"
 import OTPVerificationPage from "./pages/OTPVerificationPage"
+import HowItWorksPage from "./pages/HowItWorksPage"
+import AboutPage from "./pages/AboutPage"
+import ContactPage from "./pages/ContactPage"
 
 function App() {
   const { loading } = useAuth()
@@ -46,6 +49,11 @@ function App() {
           <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/verify-otp" element={<OTPVerificationPage />} />
           <Route path="/resend-verification" element={<ResendVerificationPage />} />
+          
+          {/* Nouvelles routes pour les pages statiques */}
+          <Route path="/how-it-works" element={<HowItWorksPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
 
           <Route path="/elections" element={<ElectionsPage />} />
           <Route path="/elections/:id" element={<ElectionDetailsPage />} />
